@@ -1,0 +1,67 @@
+---
+title: "Practical Machine Learning"
+author: "Gergely Kiss"
+date: "Sunday, May 24, 2015"
+output: html_document
+---
+#Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+#Reading raw data
+
+First I download the data from its original location. While reading the data, I convert all the "NA", "#DIV/0" and "" strings to NA. Variables that contain NA-s are removed from the data set.
+
+The first seven columns are descriptors, they are not contributing into the prediction, thus they shall be removed.
+
+```{r eval=FALSE}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile="pml-training.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile="pml-testing.csv")
+```
+
+```{r}
+orig_train <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!", "", " "), header=TRUE)
+orig_test <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!", "", " "), header=TRUE)
+
+orig_train_NAs <- apply(orig_train, 2, function(x) {sum(is.na(x))})
+orig_train <- orig_train[,which(orig_train_NAs == 0)]
+
+orig_train   <- orig_train[,-c(1:7)]
+orig_test <- orig_test[,-c(1:7)]
+```
+
+I split the data like 70% training set and 30% test set
+
+```{r}
+set.seed(42)
+indexes = sample(1:nrow(orig_train), size=0.3*nrow(orig_train))
+train <- orig_train[-indexes,]
+test <- orig_train[indexes,]
+```
+
+#Model building
+
+I choose to fit a random forest on the cleaned data set, because it is one of the most accurate learning algorithms available. For many data sets, it produces a highly accurate classifier and it has methods for balancing error in class population unbalanced data sets. It can also give estimates of what variables are important in the classification.
+
+```{r}
+library(randomForest)
+library(caret)
+model <- randomForest(classe ~ ., data = train)
+pred <- predict(model, test)
+confusionMatrix(test$classe, pred)
+```
+
+As we can see in the confusion matrix, this model performs very well on this data set. Let's create the submission files with the provided script
+
+```{r eval=FALSE}
+result <- predict(model, orig_test)
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(result)
+```
